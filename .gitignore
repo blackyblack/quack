@@ -1,0 +1,10 @@
+.classpath
+.project
+.settings
+bin/
+*.pair
+classes/
+*.lib
+*.exp
+classes/*
+bin/*
