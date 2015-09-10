@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import nrs.Constants;
 import nrs.util.Logger;
 
 import org.eclipse.jetty.server.Server;
@@ -182,13 +183,22 @@ public class Application
     
     Logger.logMessage("Started API server at " + host + ":" + port);    
     
-    List<AssetInfo> assets = new ArrayList<AssetInfo>();        
+    //swap A and B
+    List<AssetInfo> assetsA = new ArrayList<AssetInfo>();        
     AssetInfo a = new AssetInfo();
     a.name = "";
     a.id = "17091401215301664836";
     a.quantity = 5;
     a.decimals = 0;
-    assets.add(a);
+    assetsA.add(a);
+    
+    List<AssetInfo> assetsB = new ArrayList<AssetInfo>();        
+    a = new AssetInfo();
+    a.name = "";
+    a.id = "5527630";
+    a.quantity = 5 * Constants.ONE_NXT;
+    a.decimals = 0;
+    assetsB.add(a);
     
     while(true)
     {
@@ -196,7 +206,7 @@ public class Application
       
       try
       {
-        JSONObject response = (JSONObject) InitiateHandler.instance.quackInit("blackyblack", "NXT-YTBB-LT9J-SRRR-7KLBQ", 15, assets);
+        JSONObject response = (JSONObject) InitiateHandler.instance.quackInit("blackyblack", "NXT-YTBB-LT9J-SRRR-7KLBQ", 15, assetsA);
         ///TODO: wait for initiator
         ///TODO: collect a list of initiator requests and create acceptor finishHeight, swapid and triggerhash
         ///TODO: validate swap sequence
@@ -204,7 +214,7 @@ public class Application
         String triggerhash = (String) response.get("triggerhash");
         int finishHeight = (int) (api.getCurrentBlock() + 15);
 
-        AcceptHandler.instance.quackAccept("blackyblack", "NXT-YTBB-LT9J-SRRR-7KLBQ", finishHeight, assets, swapid, triggerhash);
+        AcceptHandler.instance.quackAccept("blackyblack", "NXT-YTBB-LT9J-SRRR-7KLBQ", finishHeight, assetsB, swapid, triggerhash);
         ///TODO: wait for accept
         ///TODO: validate swap sequence
         TriggerHandler.instance.quackTrigger("blackyblack", swapid);
