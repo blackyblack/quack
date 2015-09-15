@@ -651,15 +651,9 @@ public class NxtApi implements INxtApi
     return Convert.emptyToNull((String) tx.get("fullHash"));
   }
   
-  @SuppressWarnings("unchecked")
-  public JSONObject createPhasedPayment(String recipient, String secretPhrase, String fullHash, String swapid,
+  public JSONObject createPhasedPayment(String recipient, String secretPhrase, String fullHash,
       int deadline, long finishheight, long payment, String message) throws NxtApiException
-  {
-    JSONObject messageJson = new JSONObject();
-    messageJson.put("quack", 1L);
-    messageJson.put("message", message);
-    messageJson.put("swapid", swapid);
-    
+  {    
     List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
     fields.add(new BasicNameValuePair("requestType", "sendMoney"));
     fields.add(new BasicNameValuePair("recipient", recipient));
@@ -668,7 +662,64 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("broadcast", "true"));
     fields.add(new BasicNameValuePair("deadline", "" + deadline));
     fields.add(new BasicNameValuePair("amountNQT", "" + payment));
-    fields.add(new BasicNameValuePair("message", messageJson.toString()));
+    fields.add(new BasicNameValuePair("message", message));
+    fields.add(new BasicNameValuePair("messageIsText", "true"));
+    fields.add(new BasicNameValuePair("phased", "true"));
+    fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
+    fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
+    fields.add(new BasicNameValuePair("phasingQuorum", "1"));
+    fields.add(new BasicNameValuePair("phasingLinkedFullHash", fullHash));    
+    
+    CloseableHttpResponse response = null;
+    JSONObject tx = null;
+    try
+    {
+      try 
+      {
+        UrlEncodedFormEntity entity = new UrlEncodedFormEntity(fields, "UTF-8");
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        HttpPost http = new HttpPost(NxtApi.api());
+        http.setHeader("Origin", NxtApi.host);
+        http.setEntity(entity);
+        response = httpclient.execute(http);
+        HttpEntity result = response.getEntity();
+        String content = EntityUtils.toString(result);
+        
+        JSONParser parser = new JSONParser();
+        JSONObject json = (JSONObject)parser.parse(content);
+        tx = (JSONObject) json.get("transactionJSON");
+        if(tx == null)
+        {
+          throw new NxtApiException("no transactionJSON from NRS");
+        }
+      }
+      finally
+      {
+        if(response != null)
+          response.close();
+      }
+    }
+    catch (Exception e)
+    {
+      throw new NxtApiException(e.getMessage());
+    }
+    
+    return tx;
+  }
+  
+  public JSONObject createPhasedAsset(String recipient, String secretPhrase, String fullHash,
+      int deadline, long finishheight, String assetId, Long qty, String message) throws NxtApiException
+  {    
+    List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
+    fields.add(new BasicNameValuePair("requestType", "transferAsset"));
+    fields.add(new BasicNameValuePair("recipient", recipient));
+    fields.add(new BasicNameValuePair("secretPhrase", secretPhrase));
+    fields.add(new BasicNameValuePair("feeNQT", "" + 2 * Constants.ONE_NXT));
+    fields.add(new BasicNameValuePair("broadcast", "true"));
+    fields.add(new BasicNameValuePair("deadline", "" + deadline));
+    fields.add(new BasicNameValuePair("asset", assetId)); 
+    fields.add(new BasicNameValuePair("quantityQNT", "" + qty));
+    fields.add(new BasicNameValuePair("message", message));
     fields.add(new BasicNameValuePair("messageIsText", "true"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
@@ -714,53 +765,45 @@ public class NxtApi implements INxtApi
   }
   
   @SuppressWarnings("unchecked")
-  public JSONObject createPhasedAsset(String recipient, String secretPhrase, String fullHash, String swapid,
-      int deadline, long finishheight, String assetId, Long qty, String message) throws NxtApiException
-  {
-    JSONObject messageJson = new JSONObject();
-    messageJson.put("quack", 1L);
-    messageJson.put("message", message);
-    messageJson.put("swapid", swapid);
+  public List<JSONObject> getTransactions(String account, int timelimit) throws NxtApiException
+  {    
+    String timestamp = null;
+    JSONArray a = new JSONArray();
     
-    List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
-    fields.add(new BasicNameValuePair("requestType", "transferAsset"));
-    fields.add(new BasicNameValuePair("recipient", recipient));
-    fields.add(new BasicNameValuePair("secretPhrase", secretPhrase));
-    fields.add(new BasicNameValuePair("feeNQT", "" + 2 * Constants.ONE_NXT));
-    fields.add(new BasicNameValuePair("broadcast", "true"));
-    fields.add(new BasicNameValuePair("deadline", "" + deadline));
-    fields.add(new BasicNameValuePair("asset", assetId)); 
-    fields.add(new BasicNameValuePair("quantityQNT", "" + qty));
-    fields.add(new BasicNameValuePair("message", messageJson.toString()));
-    fields.add(new BasicNameValuePair("messageIsText", "true"));
-    fields.add(new BasicNameValuePair("phased", "true"));
-    fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
-    fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
-    fields.add(new BasicNameValuePair("phasingQuorum", "1"));
-    fields.add(new BasicNameValuePair("phasingLinkedFullHash", fullHash));    
+    if(timelimit > 0)
+    {
+      if(now() > timelimit)
+      {
+        timestamp = "" + (now() - timelimit);
+      }
+    }
     
-    CloseableHttpResponse response = null;
-    JSONObject tx = null;
     try
     {
-      try 
+      List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
+      fields.add(new BasicNameValuePair("requestType", "getBlockchainTransactions"));
+      fields.add(new BasicNameValuePair("account", account));
+      if(timestamp != null)
       {
-        UrlEncodedFormEntity entity = new UrlEncodedFormEntity(fields, "UTF-8");
+        fields.add(new BasicNameValuePair("timestamp", timestamp));
+      }
+      UrlEncodedFormEntity entity = new UrlEncodedFormEntity(fields, "UTF-8");
+      
+      JSONObject json = null;
+      CloseableHttpResponse response = null;
+      try
+      {
         CloseableHttpClient httpclient = HttpClients.createDefault();
-        HttpPost http = new HttpPost(NxtApi.api());
-        http.setHeader("Origin", NxtApi.host);
+        HttpPost http = new HttpPost(api());
+        http.setHeader("Origin", host);
         http.setEntity(entity);
         response = httpclient.execute(http);
         HttpEntity result = response.getEntity();
         String content = EntityUtils.toString(result);
-        
+          
         JSONParser parser = new JSONParser();
-        JSONObject json = (JSONObject)parser.parse(content);
-        tx = (JSONObject) json.get("transactionJSON");
-        if(tx == null)
-        {
-          throw new NxtApiException("no transactionJSON from NRS");
-        }
+        json = (JSONObject)parser.parse(content);
+        a = (JSONArray)json.get("transactions");
       }
       finally
       {
@@ -772,7 +815,45 @@ public class NxtApi implements INxtApi
     {
       throw new NxtApiException(e.getMessage());
     }
+    return a;
+  }
+  
+  public JSONObject parseTransaction(String data) throws NxtApiException
+  {    
+    JSONObject json = null;
     
-    return tx;
+    try
+    {
+      List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
+      fields.add(new BasicNameValuePair("requestType", "parseTransaction"));
+      fields.add(new BasicNameValuePair("transactionBytes", data));
+      UrlEncodedFormEntity entity = new UrlEncodedFormEntity(fields, "UTF-8");
+      
+      
+      CloseableHttpResponse response = null;
+      try
+      {
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        HttpPost http = new HttpPost(api());
+        http.setHeader("Origin", host);
+        http.setEntity(entity);
+        response = httpclient.execute(http);
+        HttpEntity result = response.getEntity();
+        String content = EntityUtils.toString(result);
+          
+        JSONParser parser = new JSONParser();
+        json = (JSONObject)parser.parse(content);
+      }
+      finally
+      {
+        if(response != null)
+          response.close();
+      }
+    }
+    catch (Exception e)
+    {
+      throw new NxtApiException(e.getMessage());
+    }
+    return json;
   }
 }

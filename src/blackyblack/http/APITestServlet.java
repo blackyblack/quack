@@ -47,14 +47,16 @@ public class APITestServlet extends HttpServlet {
     boolean requirePost() {
         return false;
     }
-
 }
   
   static {
     Map<String,APIRequestHandler> map = new HashMap<>();
     
-    //new API
-    map.put("init", InitiateHandler.instance);    
+    map.put("init", InitiateHandler.instance);
+    map.put("accept", AcceptHandler.instance);
+    map.put("scan", ScanHandler.instance);
+    map.put("trigger", TriggerHandler.instance);
+    
     apiRequestHandlers = Collections.unmodifiableMap(map);
   }
   

@@ -45,9 +45,13 @@ public interface INxtApi
   
   public String getFullHash(JSONObject tx);
   
-  public JSONObject createPhasedPayment(String recipient, String secretPhrase, String fullHash, String swapid,
+  public JSONObject createPhasedPayment(String recipient, String secretPhrase, String fullHash,
       int deadline, long finishheight, long payment, String message) throws NxtApiException;
   
-  public JSONObject createPhasedAsset(String recipient, String secretPhrase, String fullHash, String swapid,
+  public JSONObject createPhasedAsset(String recipient, String secretPhrase, String fullHash,
       int deadline, long finishheight, String assetId, Long qty, String message) throws NxtApiException;
+  
+  public List<JSONObject> getTransactions(String account, int timelimit) throws NxtApiException;
+  
+  public JSONObject parseTransaction(String data) throws NxtApiException;
 }

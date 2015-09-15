@@ -4,10 +4,6 @@ import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 
-import nrs.NxtException.NxtApiException;
-import nrs.util.Convert;
-import nrs.util.Logger;
-
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -16,7 +12,10 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import blackyblack.Application;
-import blackyblack.AssetInfo;
+import blackyblack.quack.AssetInfo;
+import blackyblack.quack.QuackApp;
+import nrs.util.Convert;
+import nrs.util.Logger;
 
 public final class AcceptHandler extends APITestServlet.APIRequestHandler {
   public static final AcceptHandler instance = new AcceptHandler();
@@ -67,16 +66,8 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
       for(Object o : assetsJson)
       {
         JSONObject item = (JSONObject) o;
-        String assetid = Convert.emptyToNull((String) item.get("assetid"));
-        Long quantity = Convert.nullToZero((Long) item.get("quantity"));
-        if(assetid == null) continue;
-        if(quantity == 0) continue;
-        
         AssetInfo a = new AssetInfo();
-        a.name = "";
-        a.id = assetid;
-        a.quantity = quantity;
-        a.decimals = 0;
+        a.fromJson(item);
         assets.add(a);
       }
     }
@@ -114,7 +105,8 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
     //default timeout is 720 blocks
     if(timeout == 0)
     {
-      timeout = 720L;
+      Long height = Application.api.getCurrentBlock();
+      timeout = height + 720L;
     }
     
     String swapid = Convert.emptyToNull(req.getParameter("swapid"));
@@ -133,7 +125,7 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
     CloseableHttpResponse response = null;
     try
     {
-      answer = (JSONObject)quackAccept(secret, recipient, timeout.intValue(), assets, swapid, triggerhash);
+      answer = (JSONObject)QuackApp.instance.accept(secret, recipient, timeout.intValue(), assets, swapid, triggerhash);
     }
     catch (Exception e)
     {
@@ -154,55 +146,5 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
   @Override
   boolean requirePost() {
     return true;
-  }
-  
-  @SuppressWarnings("unchecked")
-  public JSONStreamAware quackAccept(String secret, String recipient, int finishHeight, List<AssetInfo> assets,
-      String swapid, String triggerhash) throws NxtApiException
-  {
-    //now prepare triggertx and send phased transfers
-    Long height = Application.api.getCurrentBlock();
-    int rest = finishHeight - height.intValue();
-    
-    if(rest <= 0)
-    {
-      throw new NxtApiException("Too short period until timeout");
-    }
-    
-    int deadline = rest / 2;
-    if(deadline < 3) deadline = 3;
-    if((deadline + 1) > rest)
-    {
-      throw new NxtApiException("Too short period until timeout");
-    }
-    
-    for(AssetInfo a : assets)
-    {
-      if(a.id == null) continue;
-      if(a.id.equals("5527630"))
-      {
-        JSONObject paytx = Application.api.createPhasedPayment(recipient, secret, triggerhash, swapid, deadline, finishHeight,
-            a.quantity, "");
-        if(paytx != null)
-        {
-          String txid = (String) paytx.get("transaction");
-          Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishHeight);
-        }
-        continue;
-      }
-      
-      JSONObject paytx = Application.api.createPhasedAsset(recipient, secret, triggerhash, swapid, deadline, finishHeight,
-          a.id, a.quantity, "");
-      if(paytx != null)
-      {
-        String txid = (String) paytx.get("transaction");
-        Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishHeight);
-      }
-      continue;
-    }
-    
-    JSONObject answer = new JSONObject();
-    answer.put("query_status", "good");
-    return answer;
   }
 }
