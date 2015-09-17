@@ -6,7 +6,8 @@ import java.util.List;
 public class SwapInfo
 {
   //what is announced
-  public String swapid;
+  public String triggerBytes;
+  public String triggerPrunnableBytes;
   public String triggerhash;
   public String sender;
   public String recipient;
@@ -15,12 +16,13 @@ public class SwapInfo
   //what is in blockchain
   public List<BlockAssetInfo> assetsA;
   public List<BlockAssetInfo> assetsB;
-  public int finishHeight;
+  public int minFinishHeight;
   public boolean gotTrigger;
   
   public SwapInfo()
   {
-    swapid = null;
+    triggerBytes = null;
+    triggerPrunnableBytes = null;
     triggerhash = null;
     sender = null;
     recipient = null;
@@ -28,7 +30,7 @@ public class SwapInfo
     announcedExpAssets = new ArrayList<AssetInfo>();
     assetsA = new ArrayList<BlockAssetInfo>();
     assetsB = new ArrayList<BlockAssetInfo>();
-    finishHeight = 0;
+    minFinishHeight = 0;
     gotTrigger = false;
   }
 }

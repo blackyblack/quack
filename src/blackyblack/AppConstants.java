@@ -4,7 +4,7 @@ import nrs.Constants;
 
 public final class AppConstants {
     
-    public static final String APP_VERSION = "1.0.0";
+    public static final String APP_VERSION = "1.0.1";
     
     //testnet address
     public static final String SUPPORTED_VERSION = "1";

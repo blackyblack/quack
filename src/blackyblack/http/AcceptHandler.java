@@ -21,7 +21,7 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
   public static final AcceptHandler instance = new AcceptHandler();
 
   private AcceptHandler() {
-    super("secret", "assets", "recipient", "swapid", "triggerhash", "timeout");
+    super("secret", "assets", "recipient", "triggerhash", "finishheight");
   }
 
   @SuppressWarnings("unchecked")
@@ -89,30 +89,24 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
       return JSONResponses.MISSING_ASSET;
     }
     
-    String timeoutValue = Convert.emptyToNull(req.getParameter("timeout"));
-    Long timeout = 0L;
-    if (timeoutValue != null)
+    String finishheightValue = Convert.emptyToNull(req.getParameter("finishheight"));
+    Long finishheight = 0L;
+    if (finishheightValue != null)
     {
       try 
       {
-        timeout = Long.parseLong(timeoutValue);
+        finishheight = Long.parseLong(finishheightValue);
       }
       catch (RuntimeException e)
       {
       }
     }
 
-    //default timeout is 720 blocks
-    if(timeout == 0)
+    //default height is currentHeight + 720 blocks
+    if(finishheight == 0)
     {
       Long height = Application.api.getCurrentBlock();
-      timeout = height + 720L;
-    }
-    
-    String swapid = Convert.emptyToNull(req.getParameter("swapid"));
-    if (swapid == null)
-    {
-      return JSONResponses.MISSING_TRANSACTION_BYTES_OR_JSON;
+      finishheight = height + 720L;
     }
     
     String triggerhash = Convert.emptyToNull(req.getParameter("triggerhash"));
@@ -125,7 +119,7 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
     CloseableHttpResponse response = null;
     try
     {
-      answer = (JSONObject)QuackApp.instance.accept(secret, recipient, timeout.intValue(), assets, swapid, triggerhash);
+      answer = (JSONObject)QuackApp.instance.accept(secret, recipient, finishheight.intValue(), assets, triggerhash);
     }
     catch (Exception e)
     {

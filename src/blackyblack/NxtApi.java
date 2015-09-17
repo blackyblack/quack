@@ -652,7 +652,7 @@ public class NxtApi implements INxtApi
   }
   
   public JSONObject createPhasedPayment(String recipient, String secretPhrase, String fullHash,
-      int deadline, long finishheight, long payment, String message) throws NxtApiException
+      int deadline, long finishheight, long payment, String message, String encryptedMessage) throws NxtApiException
   {    
     List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
     fields.add(new BasicNameValuePair("requestType", "sendMoney"));
@@ -664,6 +664,10 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("amountNQT", "" + payment));
     fields.add(new BasicNameValuePair("message", message));
     fields.add(new BasicNameValuePair("messageIsText", "true"));
+    fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
+    fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
+    fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
     fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
@@ -708,7 +712,7 @@ public class NxtApi implements INxtApi
   }
   
   public JSONObject createPhasedAsset(String recipient, String secretPhrase, String fullHash,
-      int deadline, long finishheight, String assetId, Long qty, String message) throws NxtApiException
+      int deadline, long finishheight, String assetId, Long qty, String message, String encryptedMessage) throws NxtApiException
   {    
     List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
     fields.add(new BasicNameValuePair("requestType", "transferAsset"));
@@ -721,6 +725,71 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("quantityQNT", "" + qty));
     fields.add(new BasicNameValuePair("message", message));
     fields.add(new BasicNameValuePair("messageIsText", "true"));
+    fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
+    fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
+    fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
+    fields.add(new BasicNameValuePair("phased", "true"));
+    fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
+    fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
+    fields.add(new BasicNameValuePair("phasingQuorum", "1"));
+    fields.add(new BasicNameValuePair("phasingLinkedFullHash", fullHash));    
+    
+    CloseableHttpResponse response = null;
+    JSONObject tx = null;
+    try
+    {
+      try 
+      {
+        UrlEncodedFormEntity entity = new UrlEncodedFormEntity(fields, "UTF-8");
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        HttpPost http = new HttpPost(NxtApi.api());
+        http.setHeader("Origin", NxtApi.host);
+        http.setEntity(entity);
+        response = httpclient.execute(http);
+        HttpEntity result = response.getEntity();
+        String content = EntityUtils.toString(result);
+        
+        JSONParser parser = new JSONParser();
+        JSONObject json = (JSONObject)parser.parse(content);
+        tx = (JSONObject) json.get("transactionJSON");
+        if(tx == null)
+        {
+          throw new NxtApiException("no transactionJSON from NRS");
+        }
+      }
+      finally
+      {
+        if(response != null)
+          response.close();
+      }
+    }
+    catch (Exception e)
+    {
+      throw new NxtApiException(e.getMessage());
+    }
+    
+    return tx;
+  }
+  
+  public JSONObject createPhasedMonetary(String recipient, String secretPhrase, String fullHash,
+      int deadline, long finishheight, String assetId, Long qty, String message, String encryptedMessage) throws NxtApiException
+  {    
+    List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
+    fields.add(new BasicNameValuePair("requestType", "transferCurrency"));
+    fields.add(new BasicNameValuePair("recipient", recipient));
+    fields.add(new BasicNameValuePair("secretPhrase", secretPhrase));
+    fields.add(new BasicNameValuePair("feeNQT", "" + 2 * Constants.ONE_NXT));
+    fields.add(new BasicNameValuePair("broadcast", "true"));
+    fields.add(new BasicNameValuePair("deadline", "" + deadline));
+    fields.add(new BasicNameValuePair("currency", assetId)); 
+    fields.add(new BasicNameValuePair("units", "" + qty));
+    fields.add(new BasicNameValuePair("message", message));
+    fields.add(new BasicNameValuePair("messageIsText", "true"));
+    fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
+    fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
+    fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
     fields.add(new BasicNameValuePair("phasingVotingModel", "4"));

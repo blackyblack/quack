@@ -11,6 +11,7 @@ import org.json.simple.JSONStreamAware;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import blackyblack.Application;
 import blackyblack.quack.AssetInfo;
 import blackyblack.quack.QuackApp;
 import nrs.util.Convert;
@@ -20,7 +21,7 @@ public final class InitiateHandler extends APITestServlet.APIRequestHandler {
   public static final InitiateHandler instance = new InitiateHandler();
 
   private InitiateHandler() {
-    super("secret", "assets", "expected_assets", "recipient", "timeout");
+    super("secret", "assets", "expected_assets", "recipient", "finishheight", "private_message");
   }
 
   @SuppressWarnings("unchecked")
@@ -125,30 +126,34 @@ public final class InitiateHandler extends APITestServlet.APIRequestHandler {
       return JSONResponses.INCORRECT_ASSET;
     }
     
-    String timeoutValue = Convert.emptyToNull(req.getParameter("timeout"));
-    Long timeout = 0L;
-    if (timeoutValue != null)
+    String finishheightValue = Convert.emptyToNull(req.getParameter("finishheight"));
+    Long finishheight = 0L;
+    if (finishheightValue != null)
     {
       try 
       {
-        timeout = Long.parseLong(timeoutValue);
+        finishheight = Long.parseLong(finishheightValue);
       }
       catch (RuntimeException e)
       {
       }
     }
 
-    //default timeout is 720 blocks
-    if(timeout == 0)
+    //default height is currentHeight + 720 blocks
+    ///HACK: default height will likely be invalid. Make it 100 blocks less than init default height
+    if(finishheight == 0)
     {
-      timeout = 720L;
+      Long height = Application.api.getCurrentBlock();
+      finishheight = height + 620L;
     }
+    
+    String privateMessage = Convert.emptyToNull(req.getParameter("private_message"));
     
     JSONObject answer = new JSONObject();
     CloseableHttpResponse response = null;
     try
     {
-      answer = (JSONObject)QuackApp.instance.init(secret, recipient, timeout, assets, expectedAssets);
+      answer = (JSONObject)QuackApp.instance.init(secret, recipient, finishheight, assets, expectedAssets, privateMessage);
     }
     catch (Exception e)
     {
