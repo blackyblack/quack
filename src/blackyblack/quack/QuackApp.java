@@ -58,9 +58,25 @@ public class QuackApp
   }
 
   @SuppressWarnings("unchecked")
-  public JSONStreamAware init(String secret, String recipient, long finishheight, List<AssetInfo> assets, List<AssetInfo> expectedAssets,
+  public JSONStreamAware init(String secret, String recipient, int finishheight, List<AssetInfo> assets, List<AssetInfo> expectedAssets,
       String privateMessage) throws NxtApiException
   {
+    Long height = Application.api.getCurrentBlock();
+    int rest = finishheight - height.intValue();
+
+    if (rest <= 0)
+    {
+      throw new NxtApiException("Too short period until timeout");
+    }
+
+    int deadline = rest / 2;
+    if (deadline < 3)
+      deadline = 3;
+    if ((deadline + 1) > rest)
+    {
+      throw new NxtApiException("Too short period until timeout");
+    }
+    
     // now prepare triggertx and send phased transfers
     JSONObject trigger = createtrigger(AppConstants.triggerAccount, secret, recipient, 1440, AppConstants.triggerFee, assets, expectedAssets);
     String fullhash = Application.api.getFullHash(trigger);
@@ -78,14 +94,6 @@ public class QuackApp
     String triggerPrunnableBytes = null;
     
     ///TODO: also get prunnable part
-
-    int deadline = (int) finishheight / 2;
-    if (deadline < 3)
-      deadline = 3;
-    if (deadline + 1 > finishheight)
-    {
-      return JSONResponses.INCORRECT_HEIGHT;
-    }
 
     //insert message with triggerBytes and invitation only in first transaction
     int count = 0;
@@ -200,6 +208,7 @@ public class QuackApp
     fields.add(new BasicNameValuePair("amountNQT", "" + payment));
     fields.add(new BasicNameValuePair("message", messageJson.toString()));
     fields.add(new BasicNameValuePair("messageIsText", "true"));
+    fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
 
     CloseableHttpResponse response = null;
     JSONObject json = null;
@@ -334,11 +343,11 @@ public class QuackApp
   }
 
   @SuppressWarnings("unchecked")
-  public JSONStreamAware accept(String secret, String recipient, int finishHeight, List<AssetInfo> assets, String triggerhash) throws NxtApiException
+  public JSONStreamAware accept(String secret, String recipient, int finishheight, List<AssetInfo> assets, String triggerhash) throws NxtApiException
   {
     // now prepare triggertx and send phased transfers
     Long height = Application.api.getCurrentBlock();
-    int rest = finishHeight - height.intValue();
+    int rest = finishheight - height.intValue();
 
     if (rest <= 0)
     {
@@ -359,31 +368,31 @@ public class QuackApp
         continue;
       if (a.type.equals("NXT"))
       {
-        JSONObject paytx = phasedPayment(recipient, secret, triggerhash, null, null, deadline, finishHeight, a.quantity, null);
+        JSONObject paytx = phasedPayment(recipient, secret, triggerhash, null, null, deadline, finishheight, a.quantity, null);
         if (paytx != null)
         {
           String txid = (String) paytx.get("transaction");
-          Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishHeight);
+          Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishheight);
         }
         continue;
       }
       
       if (a.type.equals("M"))
       {
-        JSONObject paytx = phasedMonetary(recipient, secret, triggerhash, null, null, deadline, finishHeight, a.id, a.quantity, null);
+        JSONObject paytx = phasedMonetary(recipient, secret, triggerhash, null, null, deadline, finishheight, a.id, a.quantity, null);
         if (paytx != null)
         {
           String txid = (String) paytx.get("transaction");
-          Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishHeight);
+          Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishheight);
         }
         continue;
       }
 
-      JSONObject paytx = phasedAsset(recipient, secret, triggerhash, null, null, deadline, finishHeight, a.id, a.quantity, null);
+      JSONObject paytx = phasedAsset(recipient, secret, triggerhash, null, null, deadline, finishheight, a.id, a.quantity, null);
       if (paytx != null)
       {
         String txid = (String) paytx.get("transaction");
-        Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishHeight);
+        Logger.logMessage("Queued transaction: " + txid + "; finish at " + finishheight);
       }
       continue;
     }

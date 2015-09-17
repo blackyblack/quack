@@ -667,7 +667,8 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
     fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
     fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
-    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
+    ///HACK: cannot have both encrypted and unencrypted prunnable messages
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "false"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
     fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
@@ -728,7 +729,8 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
     fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
     fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
-    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
+    ///HACK: cannot have both encrypted and unencrypted prunnable messages
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "false"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
     fields.add(new BasicNameValuePair("phasingVotingModel", "4"));
@@ -789,7 +791,8 @@ public class NxtApi implements INxtApi
     fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
     fields.add(new BasicNameValuePair("messageToEncrypt", encryptedMessage));
     fields.add(new BasicNameValuePair("messageToEncryptIsText", "true"));
-    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "true"));
+  ///HACK: cannot have both encrypted and unencrypted prunnable messages
+    fields.add(new BasicNameValuePair("encryptedMessageIsPrunable", "false"));
     fields.add(new BasicNameValuePair("phased", "true"));
     fields.add(new BasicNameValuePair("phasingFinishHeight", "" + finishheight));
     fields.add(new BasicNameValuePair("phasingVotingModel", "4"));

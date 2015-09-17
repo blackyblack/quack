@@ -102,11 +102,12 @@ public final class AcceptHandler extends APITestServlet.APIRequestHandler {
       }
     }
 
-    //default height is currentHeight + 720 blocks
+    //default height is currentHeight + 620 blocks
+    ///HACK: default height will likely be invalid. Make it 100 blocks less than init default height
     if(finishheight == 0)
     {
       Long height = Application.api.getCurrentBlock();
-      finishheight = height + 720L;
+      finishheight = height + 620L;
     }
     
     String triggerhash = Convert.emptyToNull(req.getParameter("triggerhash"));

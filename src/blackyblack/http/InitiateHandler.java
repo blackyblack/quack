@@ -140,11 +140,10 @@ public final class InitiateHandler extends APITestServlet.APIRequestHandler {
     }
 
     //default height is currentHeight + 720 blocks
-    ///HACK: default height will likely be invalid. Make it 100 blocks less than init default height
     if(finishheight == 0)
     {
       Long height = Application.api.getCurrentBlock();
-      finishheight = height + 620L;
+      finishheight = height + 720L;
     }
     
     String privateMessage = Convert.emptyToNull(req.getParameter("private_message"));
@@ -153,7 +152,7 @@ public final class InitiateHandler extends APITestServlet.APIRequestHandler {
     CloseableHttpResponse response = null;
     try
     {
-      answer = (JSONObject)QuackApp.instance.init(secret, recipient, finishheight, assets, expectedAssets, privateMessage);
+      answer = (JSONObject)QuackApp.instance.init(secret, recipient, finishheight.intValue(), assets, expectedAssets, privateMessage);
     }
     catch (Exception e)
     {
