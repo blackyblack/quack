@@ -13,7 +13,7 @@ public final class TriggerHandler extends APITestServlet.APIRequestHandler {
   public static final TriggerHandler instance = new TriggerHandler();
 
   private TriggerHandler() {
-    super("secret", "triggerBytes", "triggerPrunnableBytes");
+    super("secret", "triggerBytes");
   }
 
   @SuppressWarnings("unchecked")
@@ -31,18 +31,12 @@ public final class TriggerHandler extends APITestServlet.APIRequestHandler {
     {
       return JSONResponses.MISSING_TRANSACTION_BYTES_OR_JSON;
     }
-    
-    String triggerPrunnableBytes = Convert.emptyToNull(req.getParameter("triggerPrunnableBytes"));
-    if (triggerPrunnableBytes == null)
-    {
-      return JSONResponses.MISSING_TRANSACTION_BYTES_OR_JSON;
-    }
 
     JSONObject answer = new JSONObject();
     CloseableHttpResponse response = null;
     try
     {
-      answer = (JSONObject)QuackApp.instance.trigger(secret, triggerBytes, triggerPrunnableBytes);
+      answer = (JSONObject)QuackApp.instance.trigger(secret, triggerBytes);
     }
     catch (Exception e)
     {

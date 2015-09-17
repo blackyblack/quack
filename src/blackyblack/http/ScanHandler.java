@@ -61,7 +61,6 @@ public final class ScanHandler extends APITestServlet.APIRequestHandler {
       {
         JSONObject swapResult = new JSONObject();
         swapResult.put("triggerBytes", a.triggerBytes);
-        swapResult.put("triggerPrunnableBytes", a.triggerPrunnableBytes);
         swapResult.put("triggerhash", a.triggerhash);
         swapResult.put("sender", a.sender);
         swapResult.put("recipient", a.recipient);

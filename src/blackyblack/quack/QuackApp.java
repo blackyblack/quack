@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -77,8 +78,12 @@ public class QuackApp
       throw new NxtApiException("Too short period until timeout");
     }
     
+    byte[] publicKey = Crypto.getPublicKey(secret);
+    Long accountId = Convert.publicKeyToAccountId(publicKey);
+    String sender = Convert.rsAccount(accountId);
+    
     // now prepare triggertx and send phased transfers
-    JSONObject trigger = createtrigger(AppConstants.triggerAccount, secret, recipient, 1440, AppConstants.triggerFee, assets, expectedAssets);
+    JSONObject trigger = createtrigger(AppConstants.triggerAccount, secret, 1440, AppConstants.triggerFee);
     String fullhash = Application.api.getFullHash(trigger);
     if (fullhash == null)
     {
@@ -90,10 +95,6 @@ public class QuackApp
     {
       return JSONResponses.MISSING_TRANSACTION_BYTES_OR_JSON;
     }
-    
-    String triggerPrunnableBytes = null;
-    
-    ///TODO: also get prunnable part
 
     //insert message with triggerBytes and invitation only in first transaction
     int count = 0;
@@ -103,17 +104,20 @@ public class QuackApp
         continue;
       
       JSONObject paytx = null;
+      JSONObject messageObject = new JSONObject();
+      messageObject.put("quack", 1L);
+      String encryptedMessage = null;
+      
+      if(count == 0)
+      {
+        messageObject = createinfo(messageObject, sender, recipient, triggerBytes, assets, expectedAssets);
+        encryptedMessage = privateMessage;
+      }
+      
       if (a.type.equals("NXT"))
       {
-        if(count == 0)
-        {
-          paytx = phasedPayment(recipient, secret, fullhash, triggerBytes, triggerPrunnableBytes, deadline, finishheight, a.quantity,
-            privateMessage);
-        }
-        else
-        {
-          paytx = phasedPayment(recipient, secret, fullhash, null, null, deadline, finishheight, a.quantity, null);
-        }
+        paytx = api.createPhasedPayment(recipient, secret, fullhash, deadline, finishheight, a.quantity,
+            messageObject.toString(), encryptedMessage);
         
         if (paytx != null)
         {
@@ -126,15 +130,8 @@ public class QuackApp
       
       if (a.type.equals("M"))
       {
-        if(count == 0)
-        {
-          paytx = phasedMonetary(recipient, secret, fullhash, triggerBytes, triggerPrunnableBytes, deadline, finishheight, a.id, a.quantity,
-              privateMessage);
-        }
-        else
-        {
-          paytx = phasedMonetary(recipient, secret, fullhash, null, null, deadline, finishheight, a.id, a.quantity, null);
-        }
+        paytx = api.createPhasedMonetary(recipient, secret, fullhash, deadline, finishheight, a.id, a.quantity,
+            messageObject.toString(), encryptedMessage);
         
         if (paytx != null)
         {
@@ -144,16 +141,9 @@ public class QuackApp
         }
         continue;
       }
-
-      if(count == 0)
-      {
-        paytx = phasedAsset(recipient, secret, fullhash, triggerBytes, triggerPrunnableBytes, deadline, finishheight, a.id, a.quantity,
-            privateMessage);
-      }
-      else
-      {
-        paytx = phasedAsset(recipient, secret, fullhash, null, null, deadline, finishheight, a.id, a.quantity, null);
-      }
+      
+      paytx = api.createPhasedAsset(recipient, secret, fullhash, deadline, finishheight, a.id, a.quantity,
+          messageObject.toString(), encryptedMessage);
 
       if (paytx != null)
       {
@@ -172,31 +162,11 @@ public class QuackApp
   }
 
   @SuppressWarnings("unchecked")
-  public JSONObject createtrigger(String recipient, String secretPhrase, String acceptor, int deadline, long payment,
-      List<AssetInfo> assets, List<AssetInfo> expectedAssets) throws NxtApiException
-  {
-    byte[] publicKey = Crypto.getPublicKey(secretPhrase);
-    Long accountId = Convert.publicKeyToAccountId(publicKey);
-    String sender = Convert.rsAccount(accountId);
-    
+  public JSONObject createtrigger(String recipient, String secretPhrase, int deadline, long payment) throws NxtApiException
+  {    
     JSONObject messageJson = new JSONObject();
     messageJson.put("quack", 1L);
     messageJson.put("trigger", 1L);
-    messageJson.put("sender", sender);
-    messageJson.put("recipient", acceptor);
-    JSONArray assetsArray = new JSONArray();
-    for (AssetInfo a : assets)
-    {
-      assetsArray.add(a.toJson());
-    }
-    messageJson.put("assets", assetsArray);
-
-    assetsArray = new JSONArray();
-    for (AssetInfo a : expectedAssets)
-    {
-      assetsArray.add(a.toJson());
-    }
-    messageJson.put("expected_assets", assetsArray);
 
     List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
     fields.add(new BasicNameValuePair("requestType", "sendMoney"));
@@ -208,7 +178,7 @@ public class QuackApp
     fields.add(new BasicNameValuePair("amountNQT", "" + payment));
     fields.add(new BasicNameValuePair("message", messageJson.toString()));
     fields.add(new BasicNameValuePair("messageIsText", "true"));
-    fields.add(new BasicNameValuePair("messageIsPrunable", "true"));
+    fields.add(new BasicNameValuePair("messageIsPrunable", "false"));
 
     CloseableHttpResponse response = null;
     JSONObject json = null;
@@ -244,9 +214,31 @@ public class QuackApp
     }
     return json;
   }
+  
+  @SuppressWarnings("unchecked")
+  public JSONObject createinfo(JSONObject item, String sender, String recipient, String triggerBytes, List<AssetInfo> assets, List<AssetInfo> expectedAssets)
+  {
+    item.put("sender", sender);
+    item.put("recipient", recipient);
+    item.put("triggerBytes", triggerBytes);
+    JSONArray assetsArray = new JSONArray();
+    for (AssetInfo a : assets)
+    {
+      assetsArray.add(a.toJson());
+    }
+    item.put("assets", assetsArray);
+
+    assetsArray = new JSONArray();
+    for (AssetInfo a : expectedAssets)
+    {
+      assetsArray.add(a.toJson());
+    }
+    item.put("expected_assets", assetsArray);
+    return item;
+  }
 
   @SuppressWarnings("unchecked")
-  public JSONStreamAware trigger(String secret, String triggerBytes, String triggerPrunnableBytes) throws NxtApiException
+  public JSONStreamAware trigger(String secret, String triggerBytes) throws NxtApiException
   {
     List<BasicNameValuePair> fields = new ArrayList<BasicNameValuePair>();
     fields.add(new BasicNameValuePair("requestType", "signTransaction"));
@@ -366,9 +358,15 @@ public class QuackApp
     {
       if (a.id == null)
         continue;
+      
+      JSONObject paytx = null;
+      JSONObject messageObject = new JSONObject();
+      messageObject.put("quack", 1L);
+      
       if (a.type.equals("NXT"))
       {
-        JSONObject paytx = phasedPayment(recipient, secret, triggerhash, null, null, deadline, finishheight, a.quantity, null);
+        paytx = api.createPhasedPayment(recipient, secret, triggerhash, deadline, finishheight, a.quantity, messageObject.toString(), null);
+        
         if (paytx != null)
         {
           String txid = (String) paytx.get("transaction");
@@ -379,7 +377,8 @@ public class QuackApp
       
       if (a.type.equals("M"))
       {
-        JSONObject paytx = phasedMonetary(recipient, secret, triggerhash, null, null, deadline, finishheight, a.id, a.quantity, null);
+        paytx = api.createPhasedMonetary(recipient, secret, triggerhash, deadline, finishheight, a.id, a.quantity, messageObject.toString(), null);
+        
         if (paytx != null)
         {
           String txid = (String) paytx.get("transaction");
@@ -388,7 +387,8 @@ public class QuackApp
         continue;
       }
 
-      JSONObject paytx = phasedAsset(recipient, secret, triggerhash, null, null, deadline, finishheight, a.id, a.quantity, null);
+      paytx = api.createPhasedAsset(recipient, secret, triggerhash, deadline, finishheight, a.id, a.quantity, messageObject.toString(), null);
+      
       if (paytx != null)
       {
         String txid = (String) paytx.get("transaction");
@@ -446,6 +446,9 @@ public class QuackApp
         if(linkedhashes == null) continue;
         if(linkedhashes.size() == 0) continue;
         
+        Long finishHeight = Convert.nullToZero((Long) attach.get("phasingFinishHeight"));
+        if(finishHeight == 0) continue;
+        
         String hashdata = Convert.emptyToNull((String) linkedhashes.get(0));
         if(hashdata == null) continue;
         
@@ -459,63 +462,17 @@ public class QuackApp
         if(x == null)
         {
           x = new SwapInfo();
+          x.minFinishHeight = finishHeight.intValue();
         }
         
-        //first swapid will create swap info
-        if(x.announcedAssets.size() == 0)
-        {
-          String triggerBytes = getTriggerBytes(data);
-          String triggerPrunnableBytes = getTriggerPrunnableBytes(data);
-          
-          if(triggerBytes != null)
-          {
-            JSONObject swapTx = api.parseTransaction(triggerBytes);
-            
-            if(swapTx == null) continue;
-            attach = (JSONObject) swapTx.get("attachment");
-            if(attach == null) continue;
-            message = (String) attach.get("message");
-            data = (JSONObject) parser.parse(message);
-            if(data == null) continue;
-            
-            //parse swapid to get initiator and acceptor
-            x.sender = Convert.emptyToNull((String) data.get("sender"));
-            x.recipient = Convert.emptyToNull((String) data.get("recipient"));
-            x.triggerBytes = triggerBytes;
-            x.triggerPrunnableBytes = triggerPrunnableBytes;
-            x.triggerhash = hashdata;
-            
-            if(x.sender == null) continue;
-            if(x.recipient == null) continue;
-            
-            //parse swapid to get assets and expected_assets
-            x.announcedAssets = new ArrayList<AssetInfo>();
-            JSONArray annAssets = (JSONArray) data.get("assets");
-            if(annAssets != null)
-            {
-              for(Object o : annAssets)
-              {
-                JSONObject j = (JSONObject) o;
-                AssetInfo a = new AssetInfo();
-                a.fromJson(j);
-                x.announcedAssets.add(a);
-              }
-            }
-            
-            x.announcedExpAssets = new ArrayList<AssetInfo>();
-            annAssets = (JSONArray) data.get("expected_assets");
-            if(annAssets != null)
-            {
-              for(Object o : annAssets)
-              {
-                JSONObject j = (JSONObject) o;
-                AssetInfo a = new AssetInfo();
-                a.fromJson(j);
-                x.announcedExpAssets.add(a);
-              }
-            }
-          }
-        }
+        if(finishHeight < x.minFinishHeight) x.minFinishHeight = finishHeight.intValue();
+        
+        x.triggerhash = hashdata;
+        //fill x with information about swap if present
+        tryUpdateInformation(account, txSender, x, data);
+        
+        List<BlockAssetInfo> assets = x.assets.get(txSender);
+        if(assets == null) assets = new ArrayList<BlockAssetInfo>();
         
         BlockAssetInfo assetInfo = new BlockAssetInfo();
         assetInfo.tx = tx;
@@ -539,18 +496,9 @@ public class QuackApp
           }
           
           assetInfo.asset = assetInfoData;
-          
-          if(txSender.equals(x.sender))
-          {
-            x.assetsA.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          else if(txSender.equals(x.recipient))
-          {
-            x.assetsB.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          
+          assets.add(assetInfo);
+          x.assets.put(txSender, assets);
+          lookup.put(hashdata, x);
           continue;
         }
         
@@ -566,18 +514,9 @@ public class QuackApp
           assetInfoData.type = "A";
           
           assetInfo.asset = assetInfoData;
-          
-          if(txSender.equals(x.sender))
-          {
-            x.assetsA.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          else if(txSender.equals(x.recipient))
-          {
-            x.assetsB.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          
+          assets.add(assetInfo);
+          x.assets.put(txSender, assets);
+          lookup.put(hashdata, x);
           continue;
         }
         
@@ -593,18 +532,9 @@ public class QuackApp
           assetInfoData.type = "M";
           
           assetInfo.asset = assetInfoData;
-          
-          if(txSender.equals(x.sender))
-          {
-            x.assetsA.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          else if(txSender.equals(x.recipient))
-          {
-            x.assetsB.add(assetInfo);
-            lookup.put(hashdata, x);
-          }
-          
+          assets.add(assetInfo);
+          x.assets.put(txSender, assets);
+          lookup.put(hashdata, x);
           continue;
         }
         
@@ -617,15 +547,105 @@ public class QuackApp
       }
     }
     
-    for(String k : lookup.keySet())
+    for(Entry<String, SwapInfo> k : lookup.entrySet())
     {
-      SwapInfo a = lookup.get(k);
+      SwapInfo a = k.getValue();
       if(a == null) continue;
+
+      for(String j : a.assets.keySet())
+      {
+        List<BlockAssetInfo> l = a.assets.get(j);
+        if(l == null) continue;
+        if(l.size() == 0) continue;
+        
+        if(j.equals(a.sender))
+        {
+          a.assetsA = new ArrayList<BlockAssetInfo>(l);
+        }
+        else if(j.equals(a.recipient))
+        {
+          a.assetsB = new ArrayList<BlockAssetInfo>(l);
+        }
+      }
+      
       result.add(a);
     }
+
     return result;
   }
   
+  void tryUpdateInformation(String account, String txSender, SwapInfo x, JSONObject data)
+  {
+    String triggerBytes = getTriggerBytes(data);
+    if(triggerBytes == null) return;
+    
+    //but we already have something - make a security check
+    if(x.announcedAssets.size() != 0)
+    {
+      //not my account is sender - skip
+      if(!txSender.equals(account)) return;
+    }
+      
+    JSONObject swapTx = null;
+    try
+    {
+      swapTx = api.parseTransaction(triggerBytes);
+    }
+    catch (NxtApiException e)
+    {
+      return;
+    }
+      
+    String feeNqtString = Convert.emptyToNull((String) swapTx.get("amountNQT"));
+    Long feeNQT = 0L;
+    if(feeNqtString != null)
+    {
+      feeNQT = Long.parseLong(feeNqtString);
+    }
+      
+    //trigger fee enforcement
+    if(feeNQT < AppConstants.triggerFee) return;
+      
+    String feeRecipient = Convert.emptyToNull((String) swapTx.get("recipientRS"));
+    if(feeRecipient == null) return;
+    if(!feeRecipient.equals(AppConstants.triggerAccount)) return;
+      
+    //parse message to get initiator and acceptor
+    x.sender = Convert.emptyToNull((String) data.get("sender"));
+    x.recipient = Convert.emptyToNull((String) data.get("recipient"));
+    x.triggerBytes = triggerBytes;
+      
+    if(x.sender == null) return;
+    if(x.recipient == null) return;
+      
+    //parse swapid to get assets and expected_assets
+    x.announcedAssets = new ArrayList<AssetInfo>();
+    JSONArray annAssets = (JSONArray) data.get("assets");
+    if(annAssets != null)
+    {
+      for(Object o : annAssets)
+      {
+        JSONObject j = (JSONObject) o;
+        AssetInfo a = new AssetInfo();
+        a.fromJson(j);
+        x.announcedAssets.add(a);
+      }
+    }
+      
+    x.announcedExpAssets = new ArrayList<AssetInfo>();
+    annAssets = (JSONArray) data.get("expected_assets");
+    if(annAssets != null)
+    {
+      for(Object o : annAssets)
+      {
+        JSONObject j = (JSONObject) o;
+        AssetInfo a = new AssetInfo();
+        a.fromJson(j);
+        x.announcedExpAssets.add(a);
+      }
+    }    
+  }
+
   boolean isQuack(JSONObject message)
   {
     if(!message.containsKey("quack")) return false;
@@ -647,72 +667,5 @@ public class QuackApp
     if(!message.containsKey("triggerBytes")) return null;
     String v = Convert.emptyToNull((String) message.get("triggerBytes"));
     return v;
-  }
-  
-  String getTriggerPrunnableBytes(JSONObject message)
-  {
-    if(!message.containsKey("triggerPrunnableBytes")) return null;
-    String v = Convert.emptyToNull((String) message.get("triggerPrunnableBytes"));
-    return v;
-  }
-  
-  @SuppressWarnings("unchecked")
-  JSONObject phasedPayment(String recipient, String secretPhrase, String fullHash, String triggerBytes, String triggerPrunnableBytes,
-      int deadline, long finishheight, long payment, String encryptedMessage) throws NxtApiException
-  {
-    JSONObject messageJson = new JSONObject();
-    messageJson.put("quack", 1L);
-    if(triggerBytes != null)
-    {
-      messageJson.put("triggerBytes", triggerBytes);
-    }
-    if(triggerPrunnableBytes != null)
-    {
-      messageJson.put("triggerPrunnableBytes", triggerPrunnableBytes);
-    }
-    
-    JSONObject paytx = api.createPhasedPayment(recipient, secretPhrase, fullHash, deadline, finishheight, payment,
-        messageJson.toString(), encryptedMessage);
-    return paytx;
-  }
-  
-  @SuppressWarnings("unchecked")
-  JSONObject phasedAsset(String recipient, String secretPhrase, String fullHash, String triggerBytes, String triggerPrunnableBytes,
-      int deadline, long finishheight, String assetId, long payment, String encryptedMessage) throws NxtApiException
-  {
-    JSONObject messageJson = new JSONObject();
-    messageJson.put("quack", 1L);
-    if(triggerBytes != null)
-    {
-      messageJson.put("triggerBytes", triggerBytes);
-    }
-    if(triggerPrunnableBytes != null)
-    {
-      messageJson.put("triggerPrunnableBytes", triggerPrunnableBytes);
-    }
-    
-    JSONObject paytx = api.createPhasedAsset(recipient, secretPhrase, fullHash, deadline, finishheight, assetId, payment,
-        messageJson.toString(), encryptedMessage);
-    return paytx;
-  }
-  
-  @SuppressWarnings("unchecked")
-  JSONObject phasedMonetary(String recipient, String secretPhrase, String fullHash, String triggerBytes, String triggerPrunnableBytes,
-      int deadline, long finishheight, String assetId, long payment, String encryptedMessage) throws NxtApiException
-  {
-    JSONObject messageJson = new JSONObject();
-    messageJson.put("quack", 1L);
-    if(triggerBytes != null)
-    {
-      messageJson.put("triggerBytes", triggerBytes);
-    }
-    if(triggerPrunnableBytes != null)
-    {
-      messageJson.put("triggerPrunnableBytes", triggerPrunnableBytes);
-    }
-    
-    JSONObject paytx = api.createPhasedMonetary(recipient, secretPhrase, fullHash, deadline, finishheight, assetId, payment,
-        messageJson.toString(), encryptedMessage);
-    return paytx;
   }
 }

@@ -8,3 +8,6 @@ classes/
 *.exp
 classes/*
 bin/*
+*.log
+*.lck
+quack.jar
